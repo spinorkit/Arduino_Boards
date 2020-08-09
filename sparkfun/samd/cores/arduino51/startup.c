@@ -36,10 +36,13 @@
 #define GENERIC_CLOCK_GENERATOR_12M_SYNC   GCLK_SYNCBUSY_GENCTRL4
 
 //USE DPLL0 for 120MHZ
-#define MAIN_CLOCK_SOURCE				  GCLK_GENCTRL_SRC_DPLL0
+//#define MAIN_CLOCK_SOURCE				  GCLK_GENCTRL_SRC_DPLL0
+#define MAIN_CLOCK_SOURCE				  GCLK_GENCTRL_SRC_DPLL1
 
-#define GENERIC_CLOCK_GENERATOR_1M		  (5u)
-#define GENERIC_CLOCK_GENERATOR_1M_SYNC   GCLK_SYNCBUSY_GENCTRL5
+//#define GENERIC_CLOCK_GENERATOR_1M		  (5u)
+//#define GENERIC_CLOCK_GENERATOR_1M_SYNC   GCLK_SYNCBUSY_GENCTRL5
+#define GENERIC_CLOCK_GENERATOR_256K		  (5u)
+#define GENERIC_CLOCK_GENERATOR_256K_SYNC   GCLK_SYNCBUSY_GENCTRL5
 
 //#define CRYSTALLESS
 
@@ -150,62 +153,24 @@ void SystemInit( void )
       /* Wait for synchronization */
     }
   
-//   GCLK->GENCTRL[GENERIC_CLOCK_GENERATOR_1M].reg = GCLK_GENCTRL_SRC(GCLK_GENCTRL_SRC_DFLL_Val) | GCLK_GENCTRL_GENEN | GCLK_GENCTRL_DIV(48u);
-  
-//   while ( GCLK->SYNCBUSY.bit.GENCTRL5 ){
-//     /* Wait for synchronization */
-//   }
   
 	  
   /* ------------------------------------------------------------------------
   * Set up the PLLs
   */
-    {
-  //PLL1 is 96MHz
-   const uint32_t targetFreq = 96000000;
-   const uint32_t PllFactInt = targetFreq/32768 - 1; //2928
-   const int kFractionalAdj = 2; //For some reason this greatly reduces a drift (lack of phase lock) between the input and output of the PLL
-	const uint32_t PllFactFra = (32*(targetFreq - 32768*(PllFactInt+1)))/32768 + kFractionalAdj; //22+2
 
-  //GCLK->PCHCTRL[OSCCTRL_GCLK_ID_FDPLL1].reg = (1 << GCLK_PCHCTRL_CHEN_Pos) | GCLK_PCHCTRL_GEN(GCLK_PCHCTRL_GEN_GCLK5_Val);
-  
-  OSCCTRL->Dpll[1].DPLLRATIO.reg = OSCCTRL_DPLLRATIO_LDRFRAC(PllFactFra) | OSCCTRL_DPLLRATIO_LDR(PllFactInt); //96 Mhz
-  
-  while(OSCCTRL->Dpll[1].DPLLSYNCBUSY.bit.DPLLRATIO);
-  
-  //MUST USE LBYPASS DUE TO BUG IN REV A OF SAMD51
-  OSCCTRL->Dpll[1].DPLLCTRLB.reg = OSCCTRL_DPLLCTRLB_REFCLK_XOSC32 | OSCCTRL_DPLLCTRLB_LBYPASS;
-  
-  OSCCTRL->Dpll[1].DPLLCTRLA.reg = OSCCTRL_DPLLCTRLA_ENABLE;
-  while(OSCCTRL->Dpll[1].DPLLSYNCBUSY.bit.ENABLE);
-  
-  while( OSCCTRL->Dpll[1].DPLLSTATUS.bit.CLKRDY == 0 || OSCCTRL->Dpll[1].DPLLSTATUS.bit.LOCK == 0 );
-
-   }
-
-//GCLK5 is 1 MHz got by dividing PLL1 by 96
-  GCLK->GENCTRL[GENERIC_CLOCK_GENERATOR_1M].reg = GCLK_GENCTRL_SRC(GCLK_GENCTRL_SRC_DPLL1_Val) |
-      GCLK_GENCTRL_IDC |
-      GCLK_GENCTRL_GENEN |
-      GCLK_GENCTRL_DIV(96u);
-  
-  while ( GCLK->SYNCBUSY.reg & GENERIC_CLOCK_GENERATOR_1M_SYNC ){
-    /* Wait for synchronization */
-  }
-
-
-   {
-  //PLL0 is 120MHz, multiplied up from 1 MHz GENERIC_CLOCK_GENERATOR_1M
+{
+  //PLL0 is 131072 kHz, multiplied up from OSCCTRL_DPLLCTRLB_REFCLK_XOSC32 (32768 Hz)
 
   //use the 1MHz GCLK5 as source
-  GCLK->PCHCTRL[OSCCTRL_GCLK_ID_FDPLL0].reg = (1 << GCLK_PCHCTRL_CHEN_Pos) | GCLK_PCHCTRL_GEN(GCLK_PCHCTRL_GEN_GCLK5_Val);
+  //GCLK->PCHCTRL[OSCCTRL_GCLK_ID_FDPLL0].reg = (1 << GCLK_PCHCTRL_CHEN_Pos) | GCLK_PCHCTRL_GEN(GCLK_PCHCTRL_GEN_GCLK5_Val);
   
-  OSCCTRL->Dpll[0].DPLLRATIO.reg = OSCCTRL_DPLLRATIO_LDRFRAC(0) | OSCCTRL_DPLLRATIO_LDR(119); //120 Mhz
+  OSCCTRL->Dpll[0].DPLLRATIO.reg = OSCCTRL_DPLLRATIO_LDRFRAC(0) | OSCCTRL_DPLLRATIO_LDR((4000-1)); //131072 kHz
   
   while(OSCCTRL->Dpll[0].DPLLSYNCBUSY.bit.DPLLRATIO);
   
-  //Use GCLK as source (GCLK5). MUST USE LBYPASS DUE TO BUG IN REV A OF SAMD51
-  OSCCTRL->Dpll[0].DPLLCTRLB.reg = OSCCTRL_DPLLCTRLB_REFCLK_GCLK | OSCCTRL_DPLLCTRLB_LBYPASS;
+  //Use XOSC32. MUST USE LBYPASS DUE TO BUG IN REV A OF SAMD51
+  OSCCTRL->Dpll[0].DPLLCTRLB.reg = OSCCTRL_DPLLCTRLB_REFCLK_XOSC32 | OSCCTRL_DPLLCTRLB_LBYPASS;
   
   OSCCTRL->Dpll[0].DPLLCTRLA.reg = OSCCTRL_DPLLCTRLA_ENABLE;
   while(OSCCTRL->Dpll[0].DPLLSYNCBUSY.bit.ENABLE);
@@ -214,6 +179,44 @@ void SystemInit( void )
   while( OSCCTRL->Dpll[0].DPLLSTATUS.bit.CLKRDY == 0 || OSCCTRL->Dpll[0].DPLLSTATUS.bit.LOCK == 0 );
    }
 
+//GCLK5 is 256 kHz got by dividing PLL0 by 512
+  GCLK->GENCTRL[GENERIC_CLOCK_GENERATOR_256K].reg = GCLK_GENCTRL_SRC(GCLK_GENCTRL_SRC_DPLL0_Val) |
+      GCLK_GENCTRL_IDC |
+      GCLK_GENCTRL_GENEN |
+      GCLK_GENCTRL_DIVSEL |
+      GCLK_GENCTRL_DIV(9u);
+  
+  while ( GCLK->SYNCBUSY.reg & GENERIC_CLOCK_GENERATOR_256K_SYNC ){
+    /* Wait for synchronization */
+  }
+
+
+    {
+  //PLL1 is 96MHz got by multiplying 256000 from GCLK5 by 375
+   // const uint32_t targetFreq = 96000000;
+   // const uint32_t PllFactInt = targetFreq/32768 - 1; //2928
+   // const int kFractionalAdj = 2; //For some reason this greatly reduces a drift (lack of phase lock) between the input and output of the PLL
+	// const uint32_t PllFactFra = (32*(targetFreq - 32768*(PllFactInt+1)))/32768 + kFractionalAdj; //22+2
+
+  GCLK->PCHCTRL[OSCCTRL_GCLK_ID_FDPLL1].reg = (1 << GCLK_PCHCTRL_CHEN_Pos) | GCLK_PCHCTRL_GEN(GCLK_PCHCTRL_GEN_GCLK5_Val);
+  
+  OSCCTRL->Dpll[1].DPLLRATIO.reg = OSCCTRL_DPLLRATIO_LDRFRAC(0) | OSCCTRL_DPLLRATIO_LDR(375-1); //96 Mhz
+  
+  while(OSCCTRL->Dpll[1].DPLLSYNCBUSY.bit.DPLLRATIO);
+  
+  //MUST USE LBYPASS DUE TO BUG IN REV A OF SAMD51
+  OSCCTRL->Dpll[1].DPLLCTRLB.reg = OSCCTRL_DPLLCTRLB_REFCLK_GCLK | OSCCTRL_DPLLCTRLB_LBYPASS;
+  
+  OSCCTRL->Dpll[1].DPLLCTRLA.reg = OSCCTRL_DPLLCTRLA_ENABLE;
+  while(OSCCTRL->Dpll[1].DPLLSYNCBUSY.bit.ENABLE);
+  
+  while( OSCCTRL->Dpll[1].DPLLSTATUS.bit.CLKRDY == 0 || OSCCTRL->Dpll[1].DPLLSTATUS.bit.LOCK == 0 );
+
+   }
+
+
+
+   
     
   
   /* ------------------------------------------------------------------------
@@ -244,7 +247,7 @@ void SystemInit( void )
       /* Wait for synchronization */
     }
 
-//GCLK4 is 12 MHz got by dividing PLL1 by 8
+//12MHZ CLOCK FOR DAC GCLK4 is 12 MHz got by dividing PLL1 by 8
  GCLK->GENCTRL[GENERIC_CLOCK_GENERATOR_12M].reg = GCLK_GENCTRL_SRC(GCLK_GENCTRL_SRC_DPLL1_Val) |
    GCLK_GENCTRL_IDC |
    GCLK_GENCTRL_GENEN |
@@ -255,19 +258,6 @@ void SystemInit( void )
   }
 
 
-  
-//   //12MHZ CLOCK FOR DAC
-//   GCLK->GENCTRL[GENERIC_CLOCK_GENERATOR_12M].reg = GCLK_GENCTRL_SRC(GCLK_GENCTRL_SRC_DPLL1_Val) |
-//     GCLK_GENCTRL_IDC |
-//     GCLK_GENCTRL_DIV(8) |
-//     //GCLK_GENCTRL_DIVSEL |
-//     //GCLK_GENCTRL_OE |
-//     GCLK_GENCTRL_GENEN;
-  
-//   while ( GCLK->SYNCBUSY.reg & GENERIC_CLOCK_GENERATOR_12M_SYNC)
-//     {
-//       /* Wait for synchronization */
-//     }
   
   /*---------------------------------------------------------------------
    * Set up main clock
